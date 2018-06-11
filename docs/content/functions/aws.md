@@ -82,3 +82,17 @@ foo
 $ echo 'I am a {{ aws.EC2Tag "classification" "meat popsicle" }}.' | ./gomplate
 I am a meat popsicle.
 ```
+
+## `aws.DiscoverAddrsByEC2Tag`
+
+Queries the AWS EC2 API to find the IP addresses of all instances with the specified value for the given tag.
+
+Optionally, the final parameter can be used to determine which type of address is desired: `private_v4` (default), 
+`public_v4` or `public_v6`.
+
+#### Example
+
+```console
+$ echo '{{ aws.DiscoverAddrsByEC2Tag "aws:autoscaling:groupName" "consul" | data.ToJSON }' | ./gomplate
+["172.16.10.24", "172.16.10.18"]
+```
