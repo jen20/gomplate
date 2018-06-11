@@ -1,6 +1,7 @@
 package funcs
 
 import (
+	"net"
 	"sync"
 
 	"github.com/hairyhenderson/gomplate/aws"
@@ -63,6 +64,18 @@ func (a *Funcs) EC2Dynamic(key string, def ...string) string {
 func (a *Funcs) EC2Tag(tag string, def ...string) string {
 	a.infoInit.Do(a.initInfo)
 	return a.info.Tag(tag, def...)
+}
+
+// DiscoverAddrsByEC2Tag -
+func (a *Funcs) DiscoverAddrsByEC2Tag(tagName, tagValue string, addrType ...string) []net.IP {
+	a.infoInit.Do(a.initInfo)
+
+	realAddrType := "private_v4"
+	if len(addrType) == 1 {
+		realAddrType = addrType[0]
+	}
+
+	return a.info.AddressesByTag(tagName, tagValue, realAddrType)
 }
 
 func (a *Funcs) initMeta() {

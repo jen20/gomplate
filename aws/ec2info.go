@@ -1,7 +1,9 @@
 package aws
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -118,6 +120,85 @@ func (e *Ec2Info) Tag(tag string, def ...string) string {
 	}
 
 	return returnDefault(def)
+}
+
+func (e *Ec2Info) AddressesByTag(tagName, tagValue, addrType string) []net.IP {
+	if addrType != "private_v4" && addrType != "public_v4" && addrType != "public_v6" {
+		return nil
+	}
+
+	candidates := e.describeInstances([]*ec2.Filter{
+		{
+			Name:   aws.String(fmt.Sprintf("tag:%s", tagName)),
+			Values: []*string{aws.String(tagValue)},
+		},
+		{
+			Name:   aws.String("instance-state-name"),
+			Values: []*string{aws.String("running")},
+		},
+	})
+
+	if candidates == nil {
+		return nil
+	}
+
+	var addrs []string
+	for _, r := range candidates.Reservations {
+		for _, inst := range r.Instances {
+			switch addrType {
+			case "public_v6":
+				for _, networkinterface := range inst.NetworkInterfaces {
+					if networkinterface.Ipv6Addresses == nil {
+						continue
+					}
+					for _, ipv6address := range networkinterface.Ipv6Addresses {
+						addrs = append(addrs, *ipv6address.Ipv6Address)
+					}
+				}
+
+			case "public_v4":
+				if inst.PublicIpAddress == nil {
+					continue
+				}
+				addrs = append(addrs, *inst.PublicIpAddress)
+
+			default:
+				// EC2 Classic instances have no PrivateIpAddress field
+				if inst.PrivateIpAddress == nil {
+					continue
+				}
+
+				addrs = append(addrs, *inst.PrivateIpAddress)
+			}
+		}
+	}
+
+	parsedAddrs := make([]net.IP, 0, len(addrs))
+
+	for _, addr := range addrs {
+		parsed := net.ParseIP(addr)
+		if parsed != nil {
+			parsedAddrs = append(parsedAddrs, parsed)
+		}
+	}
+
+	return parsedAddrs
+}
+
+func (e *Ec2Info) describeInstances(filters []*ec2.Filter) *ec2.DescribeInstancesOutput {
+	e.describer()
+	if e.metaClient.nonAWS {
+		return nil
+	}
+
+	output, err := e.describer().DescribeInstances(&ec2.DescribeInstancesInput{
+		Filters: filters,
+	})
+	if err != nil {
+		return nil
+	}
+
+	return output
 }
 
 func (e *Ec2Info) describeInstance() (output *ec2.DescribeInstancesOutput) {
