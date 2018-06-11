@@ -4,3 +4,5 @@ report.xml
 ./gomplate
 *.cid
 *.iid
+*.iml
+/.idea/
